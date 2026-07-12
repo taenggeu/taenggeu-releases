@@ -1,0 +1,23 @@
+name: Publish Release Repository
+
+# Copy this workflow to the public taenggeu-releases repository. It is kept here
+# as the reviewed source template because the source repository is private.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Verify public release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -n "${{ github.event.release.tag_name }}"
+          gh release view "${{ github.event.release.tag_name }}" --json isDraft,isPrerelease,assets --jq '
+            if .isDraft or .isPrerelease then error("only published stable releases are allowed") else . end |
+            if ([.assets[].name] | any(. == "latest.json")) then . else error("latest.json is missing") end'
