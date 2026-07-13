@@ -27,6 +27,7 @@ jobs:
           gh release view "$tag" --json isDraft,isPrerelease,assets --jq '
             if .isDraft or .isPrerelease then error("only published stable releases are allowed") else . end |
             if ([.assets[].name] | any(. == "latest.json")) then . else error("latest.json is missing") end |
+            if ([.assets[].name] | any(. == "SHA256SUMS.txt")) then . else error("SHA256SUMS.txt is missing") end |
             if ([.assets[].name] | any(endswith(".dmg"))) then . else error("macOS DMG is missing") end |
             if ([.assets[].name] | any(endswith(".exe"))) then . else error("Windows installer is missing") end |
             if ([.assets[].name] | any(endswith(".app.tar.gz"))) then . else error("macOS updater archive is missing") end |
@@ -34,6 +35,9 @@ jobs:
             if ([.assets[].name] | any(endswith(".nsis.zip"))) then . else error("Windows updater archive is missing") end |
             if ([.assets[].name] | any(endswith(".nsis.zip.sig"))) then . else error("Windows updater signature is missing") end'
           gh release download "$tag" --dir "$release_dir"
+          test -f "$release_dir/Taenggeu_${version}_aarch64.dmg"
+          test -f "$release_dir/Taenggeu_${version}_x64-setup.exe"
+          sha256sum --check "$release_dir/SHA256SUMS.txt"
           jq -e --arg version "$version" '
             .version == $version and
             (.platforms | has("darwin-aarch64") and has("windows-x86_64")) and
