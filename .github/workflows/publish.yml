@@ -5,6 +5,12 @@ name: Publish Release Repository
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable tag to verify
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -19,12 +25,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${{ github.event.release.tag_name }}"
+          tag="${{ inputs.tag || github.event.release.tag_name }}"
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           version="${tag#v}"
           release_dir="$RUNNER_TEMP/release-assets"
           public_key="RWTMfShgsyH0Ap2rp47hP52cRkWYFY/JipyBJW/5e9Vgk2EkAwoAUbih"
-          gh release view "$tag" --json isDraft,isPrerelease,assets --jq '
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,assets --jq '
             if .isDraft or .isPrerelease then error("only published stable releases are allowed") else . end |
             if ([.assets[].name] | any(. == "latest.json")) then . else error("latest.json is missing") end |
             if ([.assets[].name] | any(. == "SHA256SUMS.txt")) then . else error("SHA256SUMS.txt is missing") end |
@@ -33,7 +39,7 @@ jobs:
             if ([.assets[].name] | any(endswith(".app.tar.gz"))) then . else error("macOS updater archive is missing") end |
             if ([.assets[].name] | any(endswith(".app.tar.gz.sig"))) then . else error("macOS updater signature is missing") end |
             if ([.assets[].name] | any(endswith(".exe.sig"))) then . else error("Windows updater signature is missing") end'
-          gh release download "$tag" --dir "$release_dir"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir "$release_dir"
           test -f "$release_dir/Taenggeu_${version}_aarch64.dmg"
           test -f "$release_dir/Taenggeu_${version}_x64-setup.exe"
           sha256sum --check "$release_dir/SHA256SUMS.txt"
