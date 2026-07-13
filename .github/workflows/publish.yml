@@ -32,8 +32,7 @@ jobs:
             if ([.assets[].name] | any(endswith(".exe"))) then . else error("Windows installer is missing") end |
             if ([.assets[].name] | any(endswith(".app.tar.gz"))) then . else error("macOS updater archive is missing") end |
             if ([.assets[].name] | any(endswith(".app.tar.gz.sig"))) then . else error("macOS updater signature is missing") end |
-            if ([.assets[].name] | any(endswith(".nsis.zip"))) then . else error("Windows updater archive is missing") end |
-            if ([.assets[].name] | any(endswith(".nsis.zip.sig"))) then . else error("Windows updater signature is missing") end'
+            if ([.assets[].name] | any(endswith(".exe.sig"))) then . else error("Windows updater signature is missing") end'
           gh release download "$tag" --dir "$release_dir"
           test -f "$release_dir/Taenggeu_${version}_aarch64.dmg"
           test -f "$release_dir/Taenggeu_${version}_x64-setup.exe"
