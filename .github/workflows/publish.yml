@@ -52,5 +52,7 @@ jobs:
             test -f "$release_dir/$archive"
             test -f "$release_dir/$archive.sig"
             test "$(tr -d '\r\n' < "$release_dir/$archive.sig")" = "$signature"
-            minisign -Vm "$release_dir/$archive" -x "$release_dir/$archive.sig" -P "$public_key"
+            decoded_signature="$RUNNER_TEMP/${archive}.minisig"
+            base64 --decode "$release_dir/$archive.sig" > "$decoded_signature"
+            minisign -Vm "$release_dir/$archive" -x "$decoded_signature" -P "$public_key"
           done
