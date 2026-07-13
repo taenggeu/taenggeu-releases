@@ -13,11 +13,41 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
+      - name: Install updater signature verifier
+        run: sudo apt-get update && sudo apt-get install -y minisign
       - name: Verify public release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          test -n "${{ github.event.release.tag_name }}"
-          gh release view "${{ github.event.release.tag_name }}" --json isDraft,isPrerelease,assets --jq '
+          tag="${{ github.event.release.tag_name }}"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          version="${tag#v}"
+          release_dir="$RUNNER_TEMP/release-assets"
+          public_key="RWTMfShgsyH0Ap2rp47hP52cRkWYFY/JipyBJW/5e9Vgk2EkAwoAUbih"
+          gh release view "$tag" --json isDraft,isPrerelease,assets --jq '
             if .isDraft or .isPrerelease then error("only published stable releases are allowed") else . end |
-            if ([.assets[].name] | any(. == "latest.json")) then . else error("latest.json is missing") end'
+            if ([.assets[].name] | any(. == "latest.json")) then . else error("latest.json is missing") end |
+            if ([.assets[].name] | any(endswith(".dmg"))) then . else error("macOS DMG is missing") end |
+            if ([.assets[].name] | any(endswith(".exe"))) then . else error("Windows installer is missing") end |
+            if ([.assets[].name] | any(endswith(".app.tar.gz"))) then . else error("macOS updater archive is missing") end |
+            if ([.assets[].name] | any(endswith(".app.tar.gz.sig"))) then . else error("macOS updater signature is missing") end |
+            if ([.assets[].name] | any(endswith(".nsis.zip"))) then . else error("Windows updater archive is missing") end |
+            if ([.assets[].name] | any(endswith(".nsis.zip.sig"))) then . else error("Windows updater signature is missing") end'
+          gh release download "$tag" --dir "$release_dir"
+          jq -e --arg version "$version" '
+            .version == $version and
+            (.platforms | has("darwin-aarch64") and has("windows-x86_64")) and
+            (.platforms["darwin-aarch64"].signature | length > 20) and
+            (.platforms["windows-x86_64"].signature | length > 20) and
+            (.platforms["darwin-aarch64"].url | contains("/taenggeu-releases/releases/download/v" + $version + "/")) and
+            (.platforms["windows-x86_64"].url | contains("/taenggeu-releases/releases/download/v" + $version + "/"))
+          ' "$release_dir/latest.json"
+          for platform in darwin-aarch64 windows-x86_64; do
+            url="$(jq -r --arg platform "$platform" '.platforms[$platform].url' "$release_dir/latest.json")"
+            archive="${url##*/}"
+            signature="$(jq -r --arg platform "$platform" '.platforms[$platform].signature' "$release_dir/latest.json" | tr -d '\r\n')"
+            test -f "$release_dir/$archive"
+            test -f "$release_dir/$archive.sig"
+            test "$(tr -d '\r\n' < "$release_dir/$archive.sig")" = "$signature"
+            minisign -Vm "$release_dir/$archive" -x "$release_dir/$archive.sig" -P "$public_key"
+          done
