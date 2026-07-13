@@ -40,18 +40,20 @@ jobs:
             if ([.assets[].name] | any(endswith(".app.tar.gz.sig"))) then . else error("macOS updater signature is missing") end |
             if ([.assets[].name] | any(endswith(".exe.sig"))) then . else error("Windows updater signature is missing") end'
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir "$release_dir"
-          test -f "$release_dir/Taenggeu_${version}_aarch64.dmg"
+          test -f "$release_dir/Taenggeu_${version}_universal.dmg"
           test -f "$release_dir/Taenggeu_${version}_x64-setup.exe"
           (cd "$release_dir" && sha256sum --check SHA256SUMS.txt)
           jq -e --arg version "$version" '
             .version == $version and
-            (.platforms | has("darwin-aarch64") and has("windows-x86_64")) and
+            (.platforms | has("darwin-aarch64") and has("darwin-x86_64") and has("windows-x86_64")) and
             (.platforms["darwin-aarch64"].signature | length > 20) and
+            (.platforms["darwin-x86_64"].signature | length > 20) and
             (.platforms["windows-x86_64"].signature | length > 20) and
             (.platforms["darwin-aarch64"].url | contains("/taenggeu-releases/releases/download/v" + $version + "/")) and
+            (.platforms["darwin-x86_64"].url | contains("/taenggeu-releases/releases/download/v" + $version + "/")) and
             (.platforms["windows-x86_64"].url | contains("/taenggeu-releases/releases/download/v" + $version + "/"))
           ' "$release_dir/latest.json"
-          for platform in darwin-aarch64 windows-x86_64; do
+          for platform in darwin-aarch64 darwin-x86_64 windows-x86_64; do
             url="$(jq -r --arg platform "$platform" '.platforms[$platform].url' "$release_dir/latest.json")"
             archive="${url##*/}"
             signature="$(jq -r --arg platform "$platform" '.platforms[$platform].signature' "$release_dir/latest.json" | tr -d '\r\n')"
