@@ -42,7 +42,7 @@ jobs:
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir "$release_dir"
           test -f "$release_dir/Taenggeu_${version}_aarch64.dmg"
           test -f "$release_dir/Taenggeu_${version}_x64-setup.exe"
-          sha256sum --check "$release_dir/SHA256SUMS.txt"
+          (cd "$release_dir" && sha256sum --check SHA256SUMS.txt)
           jq -e --arg version "$version" '
             .version == $version and
             (.platforms | has("darwin-aarch64") and has("windows-x86_64")) and
